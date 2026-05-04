@@ -26,8 +26,8 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(800, 600)
 
         # Initialize components
-        self.transcriber = Transcriber(model_size="base")
-        self.translator = Translator(model="gemma3:1b")
+        self.transcriber = Transcriber(model_size="small")
+        self.translator = Translator(model="gemma3:4b")
         self.signals = WorkerSignals()
         
         # Connect signals
