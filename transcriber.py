@@ -8,13 +8,15 @@ import pyaudio
 from faster_whisper import WhisperModel
 
 class Transcriber:
-    def __init__(self, model_size="base", device="cpu", compute_type="int8"):
+    def __init__(self, model_size="small", device="cpu", compute_type="int8"):
         print(f"Loading Whisper model '{model_size}' from local storage...")
         model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+        # Using a slightly larger model for better accuracy
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type, download_root=model_path)
         self.audio_queue = queue.Queue()
         self.is_running = False
         self.transcription_callback = None
+        self.history = "" # Keep track of recent transcription for context
 
         # Audio settings
         self.format = pyaudio.paInt16
@@ -71,7 +73,6 @@ class Transcriber:
     def _process_audio(self):
         # Accumulate audio for better transcription segments
         audio_buffer = []
-        # Whisper expects 16kHz float32 mono
         
         while self.is_running:
             try:
@@ -79,16 +80,28 @@ class Transcriber:
                 data = self.audio_queue.get(timeout=1)
                 audio_buffer.append(np.frombuffer(data, dtype=np.int16))
                 
-                # If we have enough audio (e.g., 2 seconds)
-                if len(audio_buffer) >= 20: # 20 * 100ms = 2s
+                # Increase buffer to 3 seconds for better context/accuracy (30 * 100ms)
+                if len(audio_buffer) >= 30: 
                     audio_data = np.concatenate(audio_buffer).astype(np.float32) / 32768.0
                     audio_buffer = [] # Clear for next segment
                     
-                    segments, info = self.model.transcribe(audio_data, beam_size=5, vad_filter=True)
+                    # Using larger beam size and initial prompt for better coherence
+                    # beam_size 10 provides even better results than 7
+                    segments, info = self.model.transcribe(
+                        audio_data, 
+                        beam_size=10, 
+                        vad_filter=True,
+                        vad_parameters=dict(min_silence_duration_ms=500),
+                        initial_prompt=self.history[-200:] if self.history else None
+                    )
                     
                     for segment in segments:
                         if self.transcription_callback:
-                            self.transcription_callback(segment.text.strip())
+                            text = segment.text.strip()
+                            if text:
+                                self.history += " " + text
+                                self.transcription_callback(text)
+                                
             except queue.Empty:
                 continue
             except Exception as e:
