@@ -34,6 +34,31 @@ class Translator:
             print(f"Error in translation with model {self.model}: {e}")
             return f"[Error: {e}]"
             
+    def explain(self, text, context):
+        if not text:
+            return ""
+        
+        prompt = f"Provide short explanation for the text: '{text}' in the context of this sentence: '{context}'. and then provide translation in the context in {self.target_language}. Provide only the short explained and translated text, exclude all introductory or closing remarks"
+        
+        try:
+            response = ollama.generate(model=self.model, prompt=prompt)
+            explanation = response['response'].strip()
+            return explanation
+        except Exception as e:
+            print(f"Error in explanation with model {self.model}: {e}")
+            return f"[Error: {e}]"
+
+    def simple_query(self, text):
+        if not text:
+            return ""
+        
+        try:
+            response = ollama.generate(model=self.model, prompt=text)
+            return response['response'].strip()
+        except Exception as e:
+            print(f"Error in simple query with model {self.model}: {e}")
+            return f"[Error: {e}]"
+
     def set_target_language(self, language):
         self.target_language = language
 
